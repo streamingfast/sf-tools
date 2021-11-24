@@ -49,7 +49,7 @@ func CheckMergedBlocks(
 		return err
 	}
 
-	walkPrefix := walkBlockPrefix(blockRange, fileBlockSize)
+	walkPrefix := WalkBlockPrefix(blockRange, fileBlockSize)
 
 	logger.Debug("walking merged blocks", zap.Stringer("block_range", blockRange), zap.String("walk_prefix", walkPrefix))
 	err = blocksStore.Walk(ctx, walkPrefix, ".tmp", func(filename string) error {
@@ -202,7 +202,7 @@ func validateBlockSegment(
 	}
 }
 
-func walkBlockPrefix(blockRange BlockRange, fileBlockSize uint32) string {
+func WalkBlockPrefix(blockRange BlockRange, fileBlockSize uint32) string {
 	if blockRange.Unbounded() {
 		return ""
 	}
