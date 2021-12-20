@@ -52,7 +52,9 @@ func CheckMergedBlocks(
 
 	walkPrefix := WalkBlockPrefix(blockRange, fileBlockSize)
 
-	fdb := forkable.NewForkDB()
+	tfdb := &trackedForkDB{
+		fdb: forkable.NewForkDB(),
+	}
 
 	logger.Debug("walking merged blocks", zap.Stringer("block_range", blockRange), zap.String("walk_prefix", walkPrefix))
 	err = blocksStore.Walk(ctx, walkPrefix, ".tmp", func(filename string) error {
@@ -73,7 +75,7 @@ func CheckMergedBlocks(
 		baseNum32 = uint32(baseNum)
 
 		if printDetails != PrintNothing {
-			newSeenFilters := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, fdb)
+			newSeenFilters := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
 			for key, filters := range newSeenFilters {
 				seenFilters[key] = filters
 			}
@@ -114,7 +116,11 @@ func CheckMergedBlocks(
 		actualEndBlock = uint32(blockRange.Stop)
 	}
 
-	fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(actualEndBlock)})
+	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < uint64(actualEndBlock) {
+		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), uint64(actualEndBlock)}, tfdb.lastLinkedBlock.Number)
+	} else {
+		fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(actualEndBlock)})
+	}
 
 	if len(seenFilters) > 0 {
 		fmt.Println()
@@ -134,6 +140,13 @@ func CheckMergedBlocks(
 	return nil
 }
 
+type trackedForkDB struct {
+	fdb                    *forkable.ForkDB
+	firstUnlinkableBlock   *bstream.Block
+	lastLinkedBlock        *bstream.Block
+	unlinkableSegmentCount int
+}
+
 func validateBlockSegment(
 	ctx context.Context,
 	store dstore.Store,
@@ -142,7 +155,7 @@ func validateBlockSegment(
 	blockRange BlockRange,
 	blockPrinter func(block *bstream.Block),
 	printDetails PrintDetails,
-	fdb *forkable.ForkDB,
+	tfdb *trackedForkDB,
 ) (seenFilters map[string]FilteringFilters) {
 	reader, err := store.OpenObject(ctx, segment)
 	if err != nil {
@@ -159,9 +172,6 @@ func validateBlockSegment(
 
 	// FIXME: Need to track block continuity (100, 101, 102a, 102b, 103, ...) and report which one are missing
 	seenBlockCount := 0
-	unlinkableSegmentCount := 0
-	var lastLinkedBlock *bstream.Block
-	var firstUnlinkedBlock *bstream.Block
 	for {
 		block, err := readerFactory.Read()
 		if block != nil {
@@ -175,31 +185,32 @@ func validateBlockSegment(
 				}
 			}
 
-			if !fdb.HasLIB() {
+			if !tfdb.fdb.HasLIB() {
 				//TODO: need a way to override this from Commandline when checking
-				fdb.InitLIB(block.PreviousRef())
+				tfdb.fdb.InitLIB(block.PreviousRef())
 			}
 
-			fdb.AddLink(block.AsRef(), block.PreviousRef(), nil)
-			if fdb.ReversibleSegment(block.AsRef()) == nil {
-				unlinkableSegmentCount++
-				if firstUnlinkedBlock == nil {
-					firstUnlinkedBlock = block
+			tfdb.fdb.AddLink(block.AsRef(), block.PreviousRef().ID(), nil)
+			revSeg, _ := tfdb.fdb.ReversibleSegment(block.AsRef())
+			if revSeg == nil {
+				tfdb.unlinkableSegmentCount++
+				if tfdb.firstUnlinkableBlock == nil {
+					tfdb.firstUnlinkableBlock = block
 				}
 
 				if printDetails == PrintFull {
 					// TODO: this print should be under a 'check forkable' flag?
-					fmt.Printf("block %d is not in the right chain\n", block.Num())
+					fmt.Printf("🔶 block %d is not linkable at this point\n", block.Num())
 				}
 
-				if unlinkableSegmentCount > 100 {
+				if tfdb.unlinkableSegmentCount > 99 && tfdb.unlinkableSegmentCount%100 == 0 {
 					// TODO: this print should be under a 'check forkable' flag?
-					fmt.Printf("❌ Large gap of %d blocks found in chain from %d (last linked block) to %d. \n", unlinkableSegmentCount, lastLinkedBlock.Num(), firstUnlinkedBlock.Num())
+					fmt.Printf("❌ Large gap of %d unlinkable blocks found in chain. Last linked block: %d, first Unlinkable block: %d. \n", tfdb.unlinkableSegmentCount, tfdb.lastLinkedBlock.Num(), tfdb.firstUnlinkableBlock.Num())
 				}
 			} else {
-				lastLinkedBlock = block
-				unlinkableSegmentCount = 0
-				firstUnlinkedBlock = nil
+				tfdb.lastLinkedBlock = block
+				tfdb.unlinkableSegmentCount = 0
+				tfdb.firstUnlinkableBlock = nil
 			}
 			seenBlockCount++
 
@@ -222,7 +233,7 @@ func validateBlockSegment(
 
 		if block == nil && err == io.EOF {
 			if seenBlockCount < expectedBlockCount(segment, fileBlockSize) {
-				fmt.Printf("❌ Segment %s contained only %d blocks, expected at least 100\n", segment, seenBlockCount)
+				fmt.Printf("🔶 Segment %s contained only %d blocks (< 100), this can happen on some chains\n", segment, seenBlockCount)
 			}
 
 			return
