@@ -52,6 +52,8 @@ func CheckMergedBlocks(
 
 	walkPrefix := WalkBlockPrefix(blockRange, fileBlockSize)
 
+	fdb := forkable.NewForkDB()
+
 	logger.Debug("walking merged blocks", zap.Stringer("block_range", blockRange), zap.String("walk_prefix", walkPrefix))
 	err = blocksStore.Walk(ctx, walkPrefix, ".tmp", func(filename string) error {
 		match := numberRegex.FindStringSubmatch(filename)
@@ -71,7 +73,7 @@ func CheckMergedBlocks(
 		baseNum32 = uint32(baseNum)
 
 		if printDetails != PrintNothing {
-			newSeenFilters := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails)
+			newSeenFilters := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, fdb)
 			for key, filters := range newSeenFilters {
 				seenFilters[key] = filters
 			}
@@ -140,6 +142,7 @@ func validateBlockSegment(
 	blockRange BlockRange,
 	blockPrinter func(block *bstream.Block),
 	printDetails PrintDetails,
+	fdb *forkable.ForkDB,
 ) (seenFilters map[string]FilteringFilters) {
 	reader, err := store.OpenObject(ctx, segment)
 	if err != nil {
@@ -147,8 +150,6 @@ func validateBlockSegment(
 		return
 	}
 	defer reader.Close()
-
-	fdb := forkable.NewForkDB() // FIXME this should be global to the checker
 
 	readerFactory, err := bstream.GetBlockReaderFactory.New(reader)
 	if err != nil {
@@ -158,11 +159,12 @@ func validateBlockSegment(
 
 	// FIXME: Need to track block continuity (100, 101, 102a, 102b, 103, ...) and report which one are missing
 	seenBlockCount := 0
+	unlinkableSegmentCount := 0
+	var lastLinkedBlock *bstream.Block
+	var firstUnlinkedBlock *bstream.Block
 	for {
-
 		block, err := readerFactory.Read()
 		if block != nil {
-
 			if !blockRange.Unbounded() {
 				if block.Number >= blockRange.Stop {
 					return
@@ -174,16 +176,30 @@ func validateBlockSegment(
 			}
 
 			if !fdb.HasLIB() {
-				//FIXME need a way to override this from Commandline when checking
+				//TODO: need a way to override this from Commandline when checking
 				fdb.InitLIB(block.PreviousRef())
 			}
 
 			fdb.AddLink(block.AsRef(), block.PreviousRef(), nil)
 			if fdb.ReversibleSegment(block.AsRef()) == nil {
+				unlinkableSegmentCount++
+				if firstUnlinkedBlock == nil {
+					firstUnlinkedBlock = block
+				}
 
-				// TODO: this print should be under a 'check forkable' flag, and needs a counter to see if it "never advances"....
-				// if it never advances, maybe find the hole ...
-				fmt.Println("this block is not in the right chain")
+				if printDetails == PrintFull {
+					// TODO: this print should be under a 'check forkable' flag?
+					fmt.Printf("block %d is not in the right chain\n", block.Num())
+				}
+
+				if unlinkableSegmentCount > 100 {
+					// TODO: this print should be under a 'check forkable' flag?
+					fmt.Printf("❌ Large gap of %d blocks found in chain from %d (last linked block) to %d. \n", unlinkableSegmentCount, lastLinkedBlock.Num(), firstUnlinkedBlock.Num())
+				}
+			} else {
+				lastLinkedBlock = block
+				unlinkableSegmentCount = 0
+				firstUnlinkedBlock = nil
 			}
 			seenBlockCount++
 
