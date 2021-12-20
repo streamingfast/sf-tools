@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/jsonpb"
 	"go.uber.org/zap"
@@ -147,6 +148,8 @@ func validateBlockSegment(
 	}
 	defer reader.Close()
 
+	fdb := forkable.NewForkDB() // FIXME this should be global to the checker
+
 	readerFactory, err := bstream.GetBlockReaderFactory.New(reader)
 	if err != nil {
 		fmt.Printf("❌ Unable to read blocks segment %s: %s\n", segment, err)
@@ -156,8 +159,10 @@ func validateBlockSegment(
 	// FIXME: Need to track block continuity (100, 101, 102a, 102b, 103, ...) and report which one are missing
 	seenBlockCount := 0
 	for {
+
 		block, err := readerFactory.Read()
 		if block != nil {
+
 			if !blockRange.Unbounded() {
 				if block.Number >= blockRange.Stop {
 					return
@@ -168,6 +173,18 @@ func validateBlockSegment(
 				}
 			}
 
+			if !fdb.HasLIB() {
+				//FIXME need a way to override this from Commandline when checking
+				fdb.InitLIB(block.PreviousRef())
+			}
+
+			fdb.AddLink(block.AsRef(), block.PreviousRef(), nil)
+			if fdb.ReversibleSegment(block.AsRef()) == nil {
+
+				// TODO: this print should be under a 'check forkable' flag, and needs a counter to see if it "never advances"....
+				// if it never advances, maybe find the hole ...
+				fmt.Println("this block is not in the right chain")
+			}
 			seenBlockCount++
 
 			if printDetails == PrintStats {
