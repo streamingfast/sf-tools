@@ -198,9 +198,9 @@ func validateBlockSegment(
 					tfdb.firstUnlinkableBlock = block
 				}
 
-				if printDetails == PrintFull {
+				if printDetails != PrintNothing {
 					// TODO: this print should be under a 'check forkable' flag?
-					fmt.Printf("🔶 block %d is not linkable at this point\n", block.Num())
+					fmt.Printf("🔶 Block #%d is not linkable at this point\n", block.Num())
 				}
 
 				if tfdb.unlinkableSegmentCount > 99 && tfdb.unlinkableSegmentCount%100 == 0 {
