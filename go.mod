@@ -9,5 +9,6 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20220301162141-6630bbe5996c
 	github.com/streamingfast/dstore v0.1.1-0.20220203133825-30eb2f9c5cd3
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
+	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424 // indirect
 	go.uber.org/zap v1.21.0
 )
