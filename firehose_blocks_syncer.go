@@ -80,7 +80,9 @@ func DownloadFirehoseBlocks(
 			}
 
 			blk, err := anypbToBstreamBlock(response.Block)
-
+			if err != nil {
+				return fmt.Errorf("error decoding response to bstream block: %w", err)
+			}
 			if err := mergeWriter.process(blk); err != nil {
 				return fmt.Errorf("write to blockwriter: %w", err)
 			}
@@ -108,11 +110,14 @@ type mergedBlocksWriter struct {
 }
 
 func (w *mergedBlocksWriter) process(blk *bstream.Block) error {
-	if blk.Number%100 == 0 && w.lowBlockNum == 0 {
-		if w.lowBlockNum == 0 { // initial block
-			w.lowBlockNum = blk.Number
+
+	if w.lowBlockNum == 0 { // initial block
+		if blk.Number%100 == 0 || blk.Number == bstream.GetProtocolFirstStreamableBlock {
+			w.lowBlockNum = lowBoundary(blk.Number)
 			w.blocks = append(w.blocks, blk)
 			return nil
+		} else {
+			return fmt.Errorf("received unexpected block %s (not a boundary, not the first streamable block %d)", blk, bstream.GetProtocolFirstStreamableBlock)
 		}
 	}
 
@@ -170,4 +175,8 @@ func (w *mergedBlocksWriter) writeBundle() error {
 	}
 
 	return err
+}
+
+func lowBoundary(i uint64) uint64 {
+	return i - (i % 100)
 }

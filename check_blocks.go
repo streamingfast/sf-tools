@@ -23,6 +23,7 @@ const (
 	PrintNothing PrintDetails = iota
 	PrintStats
 	PrintFull
+	MaxUint64 = ^uint64(0)
 )
 
 func CheckMergedBlocks(
@@ -39,6 +40,12 @@ func CheckMergedBlocks(
 	var expected uint32
 	var count int
 	var baseNum32 uint32
+	var highestBlockSeen uint64
+	lowestBlockSeen := MaxUint64
+
+	if blockRange.Start < bstream.GetProtocolFirstStreamableBlock {
+		blockRange.Start = bstream.GetProtocolFirstStreamableBlock
+	}
 
 	holeFound := false
 	expected = RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize)
@@ -75,10 +82,24 @@ func CheckMergedBlocks(
 		baseNum32 = uint32(baseNum)
 
 		if printDetails != PrintNothing {
-			newSeenFilters := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
+			newSeenFilters, lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
 			for key, filters := range newSeenFilters {
 				seenFilters[key] = filters
 			}
+			if lowestBlockSegment < lowestBlockSeen {
+				lowestBlockSeen = lowestBlockSegment
+			}
+			if highestBlockSegment > highestBlockSeen {
+				highestBlockSeen = highestBlockSegment
+			}
+		} else {
+			if uint64(baseNum32) < lowestBlockSeen {
+				lowestBlockSeen = uint64(baseNum32)
+			}
+			if uint64(baseNum32+fileBlockSize) > highestBlockSeen {
+				highestBlockSeen = uint64(baseNum32 + fileBlockSize)
+			}
+
 		}
 
 		if baseNum32 != expected {
@@ -111,15 +132,14 @@ func CheckMergedBlocks(
 		return err
 	}
 
-	actualEndBlock := RoundToBundleEndBlock(baseNum32, fileBlockSize)
-	if !blockRange.Unbounded() && actualEndBlock < (RoundToBundleEndBlock(uint32(blockRange.Stop), fileBlockSize)-fileBlockSize) {
-		fmt.Printf("🔶 Incomplete range %s, stopped at block %d\n", blockRange, actualEndBlock)
+	if !blockRange.Unbounded() && highestBlockSeen < blockRange.Stop || (lowestBlockSeen > blockRange.Start && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock) {
+		fmt.Printf("🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
 	}
 
-	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < uint64(actualEndBlock) {
-		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), uint64(actualEndBlock)}, tfdb.lastLinkedBlock.Number)
+	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < highestBlockSeen {
+		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), highestBlockSeen}, tfdb.lastLinkedBlock.Number)
 	} else {
-		fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(actualEndBlock)})
+		fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(highestBlockSeen)})
 	}
 
 	if len(seenFilters) > 0 {
@@ -156,7 +176,8 @@ func validateBlockSegment(
 	blockPrinter func(block *bstream.Block),
 	printDetails PrintDetails,
 	tfdb *trackedForkDB,
-) (seenFilters map[string]FilteringFilters) {
+) (seenFilters map[string]FilteringFilters, lowestBlockSeen, highestBlockSeen uint64) {
+	lowestBlockSeen = MaxUint64
 	reader, err := store.OpenObject(ctx, segment)
 	if err != nil {
 		fmt.Printf("❌ Unable to read blocks segment %s: %s\n", segment, err)
@@ -176,13 +197,19 @@ func validateBlockSegment(
 		block, err := readerFactory.Read()
 		if block != nil {
 			if !blockRange.Unbounded() {
-				if block.Number >= blockRange.Stop {
+				if block.Number > blockRange.Stop {
 					return
 				}
 
 				if block.Number < blockRange.Start {
 					continue
 				}
+			}
+			if block.Number < lowestBlockSeen {
+				lowestBlockSeen = block.Number
+			}
+			if block.Number > highestBlockSeen {
+				highestBlockSeen = block.Number
 			}
 
 			if !tfdb.fdb.HasLIB() {

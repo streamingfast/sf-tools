@@ -16,7 +16,7 @@ type BlockRange struct {
 }
 
 func (b BlockRange) Unbounded() bool {
-	return b.Start == 0 && b.Stop == 0
+	return b.Stop == 0
 }
 
 func (b BlockRange) ReprocRange() string {

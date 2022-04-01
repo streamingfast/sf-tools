@@ -1,5 +1,11 @@
 package sftools
 
+import (
+	"strings"
+
+	"github.com/dustin/go-humanize"
+)
+
 func RoundToBundleStartBlock(block, fileBlockSize uint32) uint32 {
 	// From a non-rounded block `1085` and size of `100`, we remove from it the value of
 	// `modulo % fileblock` (`85`) making it flush (`1000`).
@@ -12,4 +18,8 @@ func RoundToBundleEndBlock(block, fileBlockSize uint32) uint32 {
 	// merged block num value for this size which simply `size - 1` (`99`) giving us
 	// a resolved formulae of `1085 - (1085 % 100) + (100 - 1) = 1085 - (85) + (99)`.
 	return block - (block % fileBlockSize) + (fileBlockSize - 1)
+}
+
+func PrettyBlockNum(b uint64) string {
+	return "#" + strings.ReplaceAll(humanize.Comma(int64(b)), ",", " ")
 }
