@@ -112,8 +112,8 @@ func CheckMergedBlocks(
 	}
 
 	actualEndBlock := RoundToBundleEndBlock(baseNum32, fileBlockSize)
-	if !blockRange.Unbounded() {
-		actualEndBlock = uint32(blockRange.Stop)
+	if !blockRange.Unbounded() && actualEndBlock < (RoundToBundleEndBlock(uint32(blockRange.Stop), fileBlockSize)-fileBlockSize) {
+		fmt.Printf("🔶 Incomplete range %s, stopped at block %d\n", blockRange, actualEndBlock)
 	}
 
 	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < uint64(actualEndBlock) {
