@@ -13,11 +13,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// AnyPBDecoder will usually look like this (+ error handling):
+// FirehoseResponseDecoder will usually look like this (+ error handling):
 /*
-	block := &pbcodec.Block{} 								// chain-specific protobuf Block
-	anypb.UnmarshalTo(in, block, proto.UnmarshalOptions{})
-	return codec.BlockFromProto(block) 						// chain-specific bstream block converter
+	block := &pbcodec.Block{} 									// chain-specific protobuf Block
+	anypb.UnmarshalTo(in, in.block, proto.UnmarshalOptions{})
+	return codec.BlockFromProto(block) 							// chain-specific bstream block converter
 */
 type FirehoseResponseDecoder func(in *pbfirehose.Response) (*bstream.Block, error)
 
