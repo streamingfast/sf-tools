@@ -4,16 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-
 	"time"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/firehose/client"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose/client"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
-
 	"go.uber.org/zap"
 )
 
@@ -23,7 +19,7 @@ import (
 	anypb.UnmarshalTo(in, block, proto.UnmarshalOptions{})
 	return codec.BlockFromProto(block) 						// chain-specific bstream block converter
 */
-type AnyPBDecoder func(in *anypb.Any) (*bstream.Block, error)
+type FirehoseResponseDecoder func(in *pbfirehose.Response) (*bstream.Block, error)
 
 func DownloadFirehoseBlocks(
 	ctx context.Context,
@@ -34,7 +30,7 @@ func DownloadFirehoseBlocks(
 	startBlock uint64,
 	stopBlock uint64,
 	destURL string,
-	anypbToBstreamBlock AnyPBDecoder,
+	respDecoder FirehoseResponseDecoder,
 	logger *zap.Logger) error {
 
 	var retryDelay = time.Second * 4
@@ -79,7 +75,7 @@ func DownloadFirehoseBlocks(
 				break
 			}
 
-			blk, err := anypbToBstreamBlock(response.Block)
+			blk, err := respDecoder(response)
 			if err != nil {
 				return fmt.Errorf("error decoding response to bstream block: %w", err)
 			}
