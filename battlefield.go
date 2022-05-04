@@ -3,52 +3,59 @@ package sftools
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"os"
 	"os/exec"
+
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
-func CompareBlockFiles(blockAFilePath, blockBFilePath string, logger *zap.Logger) (bool, error) {
+func CompareBlockFiles(referenceBlockFile, otherBlockFile string, processFileContent func(cntA, cntB []byte) (interface{}, interface{}, error), logger *zap.Logger) (bool, error) {
 
 	logger.Info("comparing block files",
-		zap.String("block_a_file_path", blockAFilePath),
-		zap.String("block_b_file_path", blockBFilePath),
+		zap.String("reference_block_file", referenceBlockFile),
+		zap.String("other_block_file", otherBlockFile),
 	)
 
-	cntA, err := ioutil.ReadFile(blockAFilePath)
+	refCnt, err := ioutil.ReadFile(referenceBlockFile)
 	if err != nil {
-		return false, fmt.Errorf("unable to read block file %q: %w", blockAFilePath, err)
+		return false, fmt.Errorf("unable to read block file %q: %w", referenceBlockFile, err)
 	}
 
-	cntB, err := ioutil.ReadFile(blockBFilePath)
+	otherCnt, err := ioutil.ReadFile(otherBlockFile)
 	if err != nil {
-		return false, fmt.Errorf("unable to read block file %q: %w", blockBFilePath, err)
+		return false, fmt.Errorf("unable to read block file %q: %w", otherBlockFile, err)
 	}
 
-	var blocksAJSONInterface, blocksBJSONInterface interface{}
+	var refBlocksJsonInterface, otherBlocksJsonInterface interface{}
+	if processFileContent == nil {
+		if err = json.Unmarshal(refCnt, &refBlocksJsonInterface); err != nil {
+			return false, fmt.Errorf("unable to unmarshal block %q: %w", referenceBlockFile, err)
+		}
 
-	if err = json.Unmarshal(cntA, &blocksAJSONInterface); err != nil {
-		return false, fmt.Errorf("unable to unmarshal block %q: %w", blockAFilePath, err)
+		if err = json.Unmarshal(otherCnt, &otherBlocksJsonInterface); err != nil {
+			return false, fmt.Errorf("unable to unmarshal block %q: %w", otherBlockFile, err)
+		}
+	} else {
+		refBlocksJsonInterface, otherBlocksJsonInterface, err = processFileContent(refCnt, otherCnt)
+		if err != nil {
+			return false, fmt.Errorf("failed to process blocks content file: %w", err)
+		}
 	}
 
-	if err = json.Unmarshal(cntB, &blocksBJSONInterface); err != nil {
-		return false, fmt.Errorf("unable to unmarshal block %q: %w", blockBFilePath, err)
-	}
-
-	if assert.ObjectsAreEqualValues(blocksAJSONInterface, blocksBJSONInterface) {
+	if assert.ObjectsAreEqualValues(refBlocksJsonInterface, otherBlocksJsonInterface) {
 		fmt.Println("Files are equal, all good")
 		return true, nil
 	}
 
 	useBash := true
-	command := fmt.Sprintf("diff -C 5 \"%s\" \"%s\" | less", blockAFilePath, blockBFilePath)
+	command := fmt.Sprintf("diff -C 5 \"%s\" \"%s\" | less", referenceBlockFile, otherBlockFile)
 	if os.Getenv("DIFF_EDITOR") != "" {
-		command = fmt.Sprintf("%s \"%s\" \"%s\"", os.Getenv("DIFF_EDITOR"), blockAFilePath, blockBFilePath)
+		command = fmt.Sprintf("%s \"%s\" \"%s\"", os.Getenv("DIFF_EDITOR"), referenceBlockFile, otherBlockFile)
 	}
 
-	showDiff, wasAnswered := AskConfirmation(`File %q and %q differs, do you want to see the difference now`, blockAFilePath, blockBFilePath)
+	showDiff, wasAnswered := AskConfirmation(`File %q and %q differs, do you want to see the difference now`, referenceBlockFile, otherBlockFile)
 	if wasAnswered && showDiff {
 		diffCmd := exec.Command(command)
 		if useBash {
