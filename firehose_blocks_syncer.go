@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/firehose/client"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // FirehoseResponseDecoder will usually look like this (+ error handling):
@@ -19,7 +20,7 @@ import (
 	anypb.UnmarshalTo(in, in.block, proto.UnmarshalOptions{})
 	return codec.BlockFromProto(block) 							// chain-specific bstream block converter
 */
-type FirehoseResponseDecoder func(in *pbfirehose.Response) (*bstream.Block, error)
+type FirehoseResponseDecoder func(in *anypb.Any) (*bstream.Block, error)
 
 func DownloadFirehoseBlocks(
 	ctx context.Context,
@@ -75,7 +76,7 @@ func DownloadFirehoseBlocks(
 				break
 			}
 
-			blk, err := respDecoder(response)
+			blk, err := respDecoder(response.Block)
 			if err != nil {
 				return fmt.Errorf("error decoding response to bstream block: %w", err)
 			}
