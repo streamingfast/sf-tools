@@ -64,7 +64,7 @@ func CheckMergedBlocks(
 	}
 
 	logger.Debug("walking merged blocks", zap.Stringer("block_range", blockRange), zap.String("walk_prefix", walkPrefix))
-	err = blocksStore.Walk(ctx, walkPrefix, ".tmp", func(filename string) error {
+	err = blocksStore.Walk(ctx, walkPrefix, func(filename string) error {
 		match := numberRegex.FindStringSubmatch(filename)
 		if match == nil {
 			return nil
