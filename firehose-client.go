@@ -51,10 +51,11 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		plaintext := mustGetBool(cmd, "plaintext")
 		insecure := mustGetBool(cmd, "insecure")
 
-		firehoseClient, grpcCallOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
+		firehoseClient, connClose, grpcCallOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 		if err != nil {
 			return err
 		}
+		defer connClose()
 
 		forkSteps := []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_NEW}
 		var transforms []*anypb.Any

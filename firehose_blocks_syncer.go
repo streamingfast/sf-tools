@@ -36,10 +36,11 @@ func DownloadFirehoseBlocks(
 
 	var retryDelay = time.Second * 4
 
-	firehoseClient, grpcCallOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
+	firehoseClient, connClose, grpcCallOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 	if err != nil {
 		return err
 	}
+	defer connClose()
 
 	store, err := dstore.NewDBinStore(destURL)
 	if err != nil {
