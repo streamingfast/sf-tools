@@ -1,9 +1,11 @@
 package sftools
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/dustin/go-humanize"
+	"github.com/spf13/cobra"
 )
 
 func RoundToBundleStartBlock(block, fileBlockSize uint32) uint32 {
@@ -22,4 +24,20 @@ func RoundToBundleEndBlock(block, fileBlockSize uint32) uint32 {
 
 func PrettyBlockNum(b uint64) string {
 	return "#" + strings.ReplaceAll(humanize.Comma(int64(b)), ",", " ")
+}
+
+func mustGetString(cmd *cobra.Command, flagName string) string {
+	val, err := cmd.Flags().GetString(flagName)
+	if err != nil {
+		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+	return val
+}
+
+func mustGetBool(cmd *cobra.Command, flagName string) bool {
+	val, err := cmd.Flags().GetBool(flagName)
+	if err != nil {
+		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+	return val
 }
