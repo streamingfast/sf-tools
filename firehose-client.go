@@ -78,6 +78,16 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 			return fmt.Errorf("unable to start blocks stream: %w", err)
 		}
 
+		meta, err := stream.Header()
+		if err != nil {
+			zlog.Warn("cannot read header")
+		} else {
+			if hosts := meta.Get("hostname"); len(hosts) != 0 {
+				zlog = zlog.With(zap.String("remote_hostname", hosts[0]))
+			}
+		}
+		zlog.Info("connected")
+
 		for {
 			response, err := stream.Recv()
 			if err != nil {
