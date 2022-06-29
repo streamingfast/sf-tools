@@ -9,7 +9,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose/client"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -49,12 +49,11 @@ func DownloadFirehoseBlocks(
 	mergeWriter := newMergedBlocksWriter(store, logger)
 
 	for {
-		forkSteps := []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE}
 
 		request := &pbfirehose.Request{
-			StartBlockNum: int64(startBlock),
-			StopBlockNum:  stopBlock,
-			ForkSteps:     forkSteps,
+			StartBlockNum:     int64(startBlock),
+			StopBlockNum:      stopBlock,
+			NoReorgNavigation: true, // only final blocks
 		}
 
 		stream, err := firehoseClient.Blocks(ctx, request, grpcCallOpts...)

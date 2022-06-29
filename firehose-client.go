@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/firehose/client"
 	"github.com/streamingfast/jsonpb"
 	"github.com/streamingfast/logging"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -57,7 +57,6 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		}
 		defer connClose()
 
-		forkSteps := []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_NEW}
 		var transforms []*anypb.Any
 		if transformsSetter != nil {
 			transforms, err = transformsSetter(cmd)
@@ -69,7 +68,6 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		request := &pbfirehose.Request{
 			StartBlockNum: int64(start),
 			StopBlockNum:  stop,
-			ForkSteps:     forkSteps,
 			Transforms:    transforms,
 		}
 
