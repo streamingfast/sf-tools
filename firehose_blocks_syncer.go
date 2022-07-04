@@ -51,9 +51,9 @@ func DownloadFirehoseBlocks(
 	for {
 
 		request := &pbfirehose.Request{
-			StartBlockNum:     int64(startBlock),
-			StopBlockNum:      stopBlock,
-			NoReorgNavigation: true, // only final blocks
+			StartBlockNum:   int64(startBlock),
+			StopBlockNum:    stopBlock,
+			FinalBlocksOnly: true,
 		}
 
 		stream, err := firehoseClient.Blocks(ctx, request, grpcCallOpts...)

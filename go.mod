@@ -15,7 +15,7 @@ require (
 	github.com/streamingfast/firehose v0.1.1-0.20220629203325-f7498b95673d
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
-	github.com/streamingfast/pbgo v0.0.6-0.20220629184423-cfd0608e0cf4
+	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292

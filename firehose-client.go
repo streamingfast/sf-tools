@@ -29,6 +29,7 @@ var GetFirehoseClientCmd = func(zlog *zap.Logger, tracer logging.Tracer, transfo
 	out.Flags().StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
 	out.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to firehose")
 	out.Flags().BoolP("insecure", "k", false, "Skip SSL certificate validation when connecting to firehose")
+	out.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the cursor (useful for performance testing)")
 	return out
 }
 
@@ -50,6 +51,8 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 
 		plaintext := mustGetBool(cmd, "plaintext")
 		insecure := mustGetBool(cmd, "insecure")
+
+		printCursorOnly := mustGetBool(cmd, "print-cursor-only")
 
 		firehoseClient, connClose, grpcCallOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 		if err != nil {
@@ -86,23 +89,58 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		}
 		zlog.Info("connected")
 
+		type respChan struct {
+			ch chan string
+		}
+
+		resps := make(chan *respChan, 10)
+		allDone := make(chan bool)
+
+		if !printCursorOnly {
+			// print the responses linearly
+			go func() {
+				for resp := range resps {
+					line := <-resp.ch
+					fmt.Println(line)
+				}
+				close(allDone)
+			}()
+		}
+
 		for {
 			response, err := stream.Recv()
 			if err != nil {
 				if err == io.EOF {
-					return nil
+					break
 				}
-
 				return fmt.Errorf("stream error while receiving: %w", err)
 			}
 
-			line, err := jsonpb.MarshalToString(response)
-			if err != nil {
-				return fmt.Errorf("unable to marshal block %s to JSON", response)
+			if printCursorOnly {
+				fmt.Println(response.Cursor)
+				continue
 			}
 
-			fmt.Println(line)
+			resp := &respChan{
+				ch: make(chan string),
+			}
+			resps <- resp
+
+			// async process the response
+			go func() {
+				line, err := jsonpb.MarshalToString(response)
+				if err != nil {
+					zlog.Error("marshalling to string", zap.Error(err))
+				}
+				resp.ch <- line
+			}()
+		}
+		if printCursorOnly {
+			return nil
 		}
 
+		close(resps)
+		<-allDone
+		return nil
 	}
 }
