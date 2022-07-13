@@ -29,7 +29,8 @@ var GetFirehoseClientCmd = func(zlog *zap.Logger, tracer logging.Tracer, transfo
 	out.Flags().StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
 	out.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to firehose")
 	out.Flags().BoolP("insecure", "k", false, "Skip SSL certificate validation when connecting to firehose")
-	out.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the cursor (useful for performance testing)")
+	out.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
+	out.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	return out
 }
 
@@ -53,6 +54,7 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		insecure := mustGetBool(cmd, "insecure")
 
 		printCursorOnly := mustGetBool(cmd, "print-cursor-only")
+		finalBlocksOnly := mustGetBool(cmd, "final-blocks-only")
 
 		firehoseClient, connClose, grpcCallOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 		if err != nil {
@@ -69,9 +71,10 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		}
 
 		request := &pbfirehose.Request{
-			StartBlockNum: int64(start),
-			StopBlockNum:  stop,
-			Transforms:    transforms,
+			StartBlockNum:   int64(start),
+			StopBlockNum:    stop,
+			Transforms:      transforms,
+			FinalBlocksOnly: finalBlocksOnly,
 		}
 
 		stream, err := firehoseClient.Blocks(ctx, request, grpcCallOpts...)
@@ -117,7 +120,7 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 			}
 
 			if printCursorOnly {
-				fmt.Println(response.Cursor)
+				fmt.Printf("%s - %s\n", response.Step.String(), response.Cursor)
 				continue
 			}
 
