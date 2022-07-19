@@ -27,6 +27,7 @@ var GetFirehoseClientCmd = func(zlog *zap.Logger, tracer logging.Tracer, transfo
 		RunE:  getFirehoseClientE(zlog, tracer, transformsSetter),
 	}
 	out.Flags().StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
+	out.Flags().String("cursor", "", "Send this cursor with the request")
 	out.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to firehose")
 	out.Flags().BoolP("insecure", "k", false, "Skip SSL certificate validation when connecting to firehose")
 	out.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
@@ -49,6 +50,8 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		}
 		apiTokenEnvVar := mustGetString(cmd, "api-token-env-var")
 		jwt := os.Getenv(apiTokenEnvVar)
+
+		cursor := mustGetString(cmd, "cursor")
 
 		plaintext := mustGetBool(cmd, "plaintext")
 		insecure := mustGetBool(cmd, "insecure")
@@ -75,6 +78,7 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 			StopBlockNum:    stop,
 			Transforms:      transforms,
 			FinalBlocksOnly: finalBlocksOnly,
+			Cursor:          cursor,
 		}
 
 		stream, err := firehoseClient.Blocks(ctx, request, grpcCallOpts...)

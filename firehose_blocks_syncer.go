@@ -32,6 +32,7 @@ func DownloadFirehoseBlocks(
 	stopBlock uint64,
 	destURL string,
 	respDecoder FirehoseResponseDecoder,
+	tweakBlock func(*bstream.Block) (*bstream.Block, error),
 	logger *zap.Logger) error {
 
 	var retryDelay = time.Second * 4
@@ -46,7 +47,7 @@ func DownloadFirehoseBlocks(
 	if err != nil {
 		return err
 	}
-	mergeWriter := newMergedBlocksWriter(store, logger)
+	mergeWriter := newMergedBlocksWriter(store, logger, tweakBlock)
 
 	for {
 
@@ -90,10 +91,11 @@ func DownloadFirehoseBlocks(
 
 }
 
-func newMergedBlocksWriter(store dstore.Store, logger *zap.Logger) *mergedBlocksWriter {
+func newMergedBlocksWriter(store dstore.Store, logger *zap.Logger, tweakBlock func(*bstream.Block) (*bstream.Block, error)) *mergedBlocksWriter {
 	return &mergedBlocksWriter{
 		store:         store,
 		writerFactory: bstream.GetBlockWriterFactory,
+		tweakBlock:    tweakBlock,
 		logger:        logger,
 	}
 }
@@ -104,6 +106,7 @@ type mergedBlocksWriter struct {
 	blocks        []*bstream.Block
 	writerFactory bstream.BlockWriterFactory
 	logger        *zap.Logger
+	tweakBlock    func(*bstream.Block) (*bstream.Block, error)
 }
 
 func (w *mergedBlocksWriter) process(blk *bstream.Block) error {
@@ -125,6 +128,13 @@ func (w *mergedBlocksWriter) process(blk *bstream.Block) error {
 			return err
 		}
 		return nil
+	}
+	if w.tweakBlock != nil {
+		b, err := w.tweakBlock(blk)
+		if err != nil {
+			return fmt.Errorf("tweaking block: %w", err)
+		}
+		blk = b
 	}
 	w.blocks = append(w.blocks, blk)
 
