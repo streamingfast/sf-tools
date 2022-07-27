@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/firehose/client"
 	"github.com/streamingfast/jsonpb"
 	"github.com/streamingfast/logging"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -30,6 +30,8 @@ var GetFirehoseClientCmd = func(zlog *zap.Logger, tracer logging.Tracer, transfo
 	out.Flags().String("cursor", "", "Send this cursor with the request")
 	out.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to firehose")
 	out.Flags().BoolP("insecure", "k", false, "Skip SSL certificate validation when connecting to firehose")
+	out.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
+	out.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	return out
 }
 
@@ -54,13 +56,15 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		plaintext := mustGetBool(cmd, "plaintext")
 		insecure := mustGetBool(cmd, "insecure")
 
+		printCursorOnly := mustGetBool(cmd, "print-cursor-only")
+		finalBlocksOnly := mustGetBool(cmd, "final-blocks-only")
+
 		firehoseClient, connClose, grpcCallOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 		if err != nil {
 			return err
 		}
 		defer connClose()
 
-		forkSteps := []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_NEW}
 		var transforms []*anypb.Any
 		if transformsSetter != nil {
 			transforms, err = transformsSetter(cmd)
@@ -70,11 +74,11 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		}
 
 		request := &pbfirehose.Request{
-			StartBlockNum: int64(start),
-			StopBlockNum:  stop,
-			ForkSteps:     forkSteps,
-			Transforms:    transforms,
-			StartCursor:   cursor,
+			StartBlockNum:   int64(start),
+			StopBlockNum:    stop,
+			Transforms:      transforms,
+			FinalBlocksOnly: finalBlocksOnly,
+			Cursor:          cursor,
 		}
 
 		stream, err := firehoseClient.Blocks(ctx, request, grpcCallOpts...)
@@ -92,23 +96,58 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		}
 		zlog.Info("connected")
 
+		type respChan struct {
+			ch chan string
+		}
+
+		resps := make(chan *respChan, 10)
+		allDone := make(chan bool)
+
+		if !printCursorOnly {
+			// print the responses linearly
+			go func() {
+				for resp := range resps {
+					line := <-resp.ch
+					fmt.Println(line)
+				}
+				close(allDone)
+			}()
+		}
+
 		for {
 			response, err := stream.Recv()
 			if err != nil {
 				if err == io.EOF {
-					return nil
+					break
 				}
-
 				return fmt.Errorf("stream error while receiving: %w", err)
 			}
 
-			line, err := jsonpb.MarshalToString(response)
-			if err != nil {
-				return fmt.Errorf("unable to marshal block %s to JSON", response)
+			if printCursorOnly {
+				fmt.Printf("%s - %s\n", response.Step.String(), response.Cursor)
+				continue
 			}
 
-			fmt.Println(line)
+			resp := &respChan{
+				ch: make(chan string),
+			}
+			resps <- resp
+
+			// async process the response
+			go func() {
+				line, err := jsonpb.MarshalToString(response)
+				if err != nil {
+					zlog.Error("marshalling to string", zap.Error(err))
+				}
+				resp.ch <- line
+			}()
+		}
+		if printCursorOnly {
+			return nil
 		}
 
+		close(resps)
+		<-allDone
+		return nil
 	}
 }
