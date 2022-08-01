@@ -239,9 +239,6 @@ func validateBlockSegment(
 				tfdb.unlinkableSegmentCount = 0
 				tfdb.firstUnlinkableBlock = nil
 				tfdb.fdb.SetLIB(block, block.PreviousId, block.LibNum)
-				if tfdb.fdb.HasLIB() {
-					tfdb.fdb.PurgeBeforeLIB(0)
-				}
 			}
 			seenBlockCount++
 

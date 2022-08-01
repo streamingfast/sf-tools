@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/firehose/client"
 	"github.com/streamingfast/jsonpb"
 	"github.com/streamingfast/logging"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -72,13 +72,18 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 				return err
 			}
 		}
+		steps := []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_NEW, pbfirehose.ForkStep_STEP_UNDO}
+
+		if finalBlocksOnly {
+			steps = []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE}
+		}
 
 		request := &pbfirehose.Request{
-			StartBlockNum:   int64(start),
-			StopBlockNum:    stop,
-			Transforms:      transforms,
-			FinalBlocksOnly: finalBlocksOnly,
-			Cursor:          cursor,
+			StartBlockNum: int64(start),
+			StopBlockNum:  stop,
+			Transforms:    transforms,
+			ForkSteps:     steps,
+			StartCursor:   cursor,
 		}
 
 		stream, err := firehoseClient.Blocks(ctx, request, grpcCallOpts...)

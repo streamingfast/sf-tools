@@ -10,9 +10,9 @@ require (
 	github.com/nicksnyder/go-i18n v1.10.1 // indirect
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.8.1
-	github.com/streamingfast/bstream v0.0.2-0.20220713194026-e4696dc8aab1
+	github.com/streamingfast/bstream v0.0.2-0.20220622120622-82cc2635749d
 	github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648
-	github.com/streamingfast/firehose v0.1.1-0.20220629203325-f7498b95673d
+	github.com/streamingfast/firehose v0.1.1-0.20220623154002-1457dae0055d
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e
