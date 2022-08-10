@@ -36,7 +36,7 @@ func getMergedBlockNormalizer(zlog *zap.Logger, tracer logging.Tracer, tweakFunc
 		}
 
 		dest := args[1]
-		destStore, err := dstore.NewDBinStore(dest)
+		destStore, err := dstore.NewStore(dest, "dbin.zst", "zstd", true)
 		if err != nil {
 			return fmt.Errorf("reading destination store: %w", err)
 		}
