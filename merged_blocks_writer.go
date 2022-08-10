@@ -46,7 +46,7 @@ func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) e
 		}
 	}
 
-	if w.stopBlockNum > w.lowBlockNum && blk.Number >= w.stopBlockNum {
+	if w.stopBlockNum > 0 && blk.Number >= w.stopBlockNum {
 		return io.EOF
 	}
 
