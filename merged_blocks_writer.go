@@ -70,34 +70,35 @@ func (w *mergedBlocksWriter) writeBundle() error {
 	if len(w.blocks) == 0 {
 		return fmt.Errorf("no blocks to write to bundle")
 	}
-	writeDone := make(chan struct{})
 
 	pr, pw := io.Pipe()
-	defer func() {
-		pw.Close()
-		<-writeDone
-	}()
 
 	go func() {
-		err := w.store.WriteObject(context.Background(), file, pr)
+		var err error
+		defer func() {
+			pw.CloseWithError(err)
+		}()
+
+		blockWriter, err := w.writerFactory.New(pw)
 		if err != nil {
-			w.logger.Error("writing to store", zap.Error(err))
+			return
 		}
-		w.lowBlockNum += 100
-		w.blocks = nil
-		close(writeDone)
+
+		for _, blk := range w.blocks {
+			err = blockWriter.Write(blk)
+			if err != nil {
+				return
+			}
+		}
 	}()
 
-	blockWriter, err := w.writerFactory.New(pw)
+	err := w.store.WriteObject(context.Background(), file, pr)
 	if err != nil {
-		return err
+		w.logger.Error("writing to store", zap.Error(err))
 	}
 
-	for _, blk := range w.blocks {
-		if err := blockWriter.Write(blk); err != nil {
-			return err
-		}
-	}
+	w.lowBlockNum += 100
+	w.blocks = nil
 
 	return err
 }
