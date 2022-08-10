@@ -35,10 +35,19 @@ func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) e
 
 	if blk.Number == w.lowBlockNum+99 {
 		w.blocks = append(w.blocks, blk)
+		if err := w.writeBundle(); err != nil {
+			return err
 
+		}
+		return nil
+	}
+
+	if blk.Number > w.lowBlockNum+99 {
 		if err := w.writeBundle(); err != nil {
 			return err
 		}
+		w.blocks = append(w.blocks, blk)
+
 		return nil
 	}
 
