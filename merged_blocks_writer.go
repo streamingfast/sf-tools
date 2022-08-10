@@ -23,6 +23,14 @@ type mergedBlocksWriter struct {
 }
 
 func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) error {
+	if w.tweakBlock != nil {
+		b, err := w.tweakBlock(blk)
+		if err != nil {
+			return fmt.Errorf("tweaking block: %w", err)
+		}
+		blk = b
+	}
+
 	if w.lowBlockNum == 0 { // initial block
 		if blk.Number%100 == 0 || blk.Number == bstream.GetProtocolFirstStreamableBlock {
 			w.lowBlockNum = lowBoundary(blk.Number)
@@ -51,20 +59,11 @@ func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) e
 		return nil
 	}
 
-	if w.tweakBlock != nil {
-		b, err := w.tweakBlock(blk)
-		if err != nil {
-			return fmt.Errorf("tweaking block: %w", err)
-		}
-		blk = b
-	}
-
 	if w.stopBlockNum > w.lowBlockNum && blk.Number >= w.stopBlockNum {
 		return io.EOF
 	}
 
 	w.blocks = append(w.blocks, blk)
-
 	return nil
 }
 
