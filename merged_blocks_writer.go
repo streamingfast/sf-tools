@@ -32,31 +32,18 @@ func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) e
 	}
 
 	if w.lowBlockNum == 0 { // initial block
-		if blk.Number%100 == 0 || blk.Number == bstream.GetProtocolFirstStreamableBlock {
-			w.lowBlockNum = lowBoundary(blk.Number)
-			w.blocks = append(w.blocks, blk)
-			return nil
-		} else {
+		if blk.Number%100 != 0 && blk.Number != bstream.GetProtocolFirstStreamableBlock {
 			return fmt.Errorf("received unexpected block %s (not a boundary, not the first streamable block %d)", blk, bstream.GetProtocolFirstStreamableBlock)
 		}
-	}
-
-	if blk.Number == w.lowBlockNum+99 {
-		w.blocks = append(w.blocks, blk)
-		if err := w.writeBundle(); err != nil {
-			return err
-
-		}
-		return nil
+		w.lowBlockNum = lowBoundary(blk.Number)
+		w.logger.Debug("setting initial boundary to %d upon seeing block %s", zap.Uint64("low_boundary", w.lowBlockNum), zap.Stringer("blk", blk))
 	}
 
 	if blk.Number > w.lowBlockNum+99 {
+		w.logger.Debug("bundling because we saw block %s from next bundle (%d was not seen, it must not exist on this chain)", zap.Stringer("blk", blk), zap.Uint64("last_bundle_block", w.lowBlockNum+99))
 		if err := w.writeBundle(); err != nil {
 			return err
 		}
-		w.blocks = append(w.blocks, blk)
-
-		return nil
 	}
 
 	if w.stopBlockNum > w.lowBlockNum && blk.Number >= w.stopBlockNum {
@@ -64,6 +51,15 @@ func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) e
 	}
 
 	w.blocks = append(w.blocks, blk)
+
+	if blk.Number == w.lowBlockNum+99 {
+		w.logger.Debug("bundling on last bundle block", zap.Uint64("last_bundle_block", w.lowBlockNum+99))
+		if err := w.writeBundle(); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	return nil
 }
 
