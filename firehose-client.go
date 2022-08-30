@@ -7,12 +7,15 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/firehose/client"
 	"github.com/streamingfast/jsonpb"
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -27,6 +30,7 @@ var GetFirehoseClientCmd = func(zlog *zap.Logger, tracer logging.Tracer, transfo
 		RunE:  getFirehoseClientE(zlog, tracer, transformsSetter),
 	}
 	out.Flags().StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
+	out.Flags().String("compression", "none", "http compression: use either 'none', 'gzip' or 'zstd'")
 	out.Flags().String("cursor", "", "Send this cursor with the request")
 	out.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to firehose")
 	out.Flags().BoolP("insecure", "k", false, "Skip SSL certificate validation when connecting to firehose")
@@ -64,6 +68,17 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 			return err
 		}
 		defer connClose()
+
+		compression := mustGetString(cmd, "compression")
+		switch compression {
+		case "gzip":
+			grpcCallOpts = append(grpcCallOpts, grpc.UseCompressor(gzip.Name))
+		case "zstd":
+			grpcCallOpts = append(grpcCallOpts, grpc.UseCompressor(zstd.Name))
+		case "none":
+		default:
+			return fmt.Errorf("invalid value for compression: only 'gzip', 'zstd' or 'none' are accepted")
+		}
 
 		var transforms []*anypb.Any
 		if transformsSetter != nil {
