@@ -213,11 +213,10 @@ func validateBlockSegment(
 			}
 
 			if !tfdb.fdb.HasLIB() {
-				//TODO: need a way to override this from Commandline when checking
-				tfdb.fdb.InitLIB(block.PreviousRef())
+				tfdb.fdb.InitLIB(block)
 			}
 
-			tfdb.fdb.AddLink(block.AsRef(), block.PreviousRef().ID(), nil)
+			tfdb.fdb.AddLink(block.AsRef(), block.PreviousID(), nil)
 			revSeg, _ := tfdb.fdb.ReversibleSegment(block.AsRef())
 			if revSeg == nil {
 				tfdb.unlinkableSegmentCount++

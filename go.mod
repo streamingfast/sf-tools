@@ -11,8 +11,7 @@ require (
 	github.com/nicksnyder/go-i18n v1.10.1 // indirect
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.8.1
-	github.com/streamingfast/bstream v0.0.2-0.20220807143416-6b46ab6f418b
-	github.com/streamingfast/dgrpc v0.0.0-20220830151315-cd9ee6079216 // indirect
+	github.com/streamingfast/bstream v0.0.2-0.20221014152708-e383606f7770
 	github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648
 	github.com/streamingfast/firehose v0.1.1-0.20220629203325-f7498b95673d
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
@@ -21,8 +20,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
-	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	google.golang.org/grpc v1.49.0
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.28.0
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20191105091915-95d230a53780 // indirect
 )

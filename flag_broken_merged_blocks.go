@@ -138,10 +138,12 @@ func checkMergedBlockFileBroken(
 		}
 
 		if !tfdb.fdb.HasLIB() {
-			tfdb.fdb.InitLIB(block.PreviousRef())
+			tfdb.fdb.AddLink(block.AsRef(), block.PreviousID(), nil)
+			tfdb.fdb.InitLIB(block)
+			continue
 		}
 
-		tfdb.fdb.AddLink(block.AsRef(), block.PreviousRef().ID(), nil)
+		tfdb.fdb.AddLink(block.AsRef(), block.PreviousID(), nil)
 		revSeg, _ := tfdb.fdb.ReversibleSegment(block.AsRef())
 		if revSeg == nil {
 			broken = true
