@@ -72,12 +72,13 @@ func getFirehoseSingleBlockClientE(zlog *zap.Logger, tracer logging.Tracer) func
 		plaintext := mustGetBool(cmd, "plaintext")
 		insecure := mustGetBool(cmd, "insecure")
 
-		firehoseClient, connClose, grpcCallOpts, err := client.NewFirehoseFetchClient(endpoint, jwt, insecure, plaintext)
+		firehoseClient, connClose, err := client.NewFirehoseFetchClient(endpoint, jwt, insecure, plaintext)
 		if err != nil {
 			return err
 		}
 		defer connClose()
 
+		var grpcCallOpts []grpc.CallOption
 		compression := mustGetString(cmd, "compression")
 		switch compression {
 		case "gzip":

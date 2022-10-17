@@ -13,7 +13,7 @@ require (
 	github.com/spf13/viper v1.8.1
 	github.com/streamingfast/bstream v0.0.2-0.20221017131819-2a7e38be1047
 	github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648
-	github.com/streamingfast/firehose v0.1.1-0.20221017143750-c857d3655494
+	github.com/streamingfast/firehose v0.1.1-0.20221017171248-8fd3adbe7b4d
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
 	github.com/streamingfast/pbgo v0.0.6-0.20221014191646-3a05d7bc30c8
