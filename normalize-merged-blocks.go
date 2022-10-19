@@ -16,18 +16,18 @@ import (
 	"github.com/streamingfast/dstore"
 )
 
-var GetMergedBlocksNormalizer = func(zlog *zap.Logger, tracer logging.Tracer, tweakFunc func(block *bstream.Block) (*bstream.Block, error)) *cobra.Command {
+var GetMergedBlocksUpgrader = func(zlog *zap.Logger, tracer logging.Tracer, tweakFunc func(block *bstream.Block) (*bstream.Block, error)) *cobra.Command {
 	out := &cobra.Command{
-		Use:   "normalize-merged-blocks <source> <destination> <start> <stop>",
-		Short: "from a merged-blocks source, rewrite normalized blocks to a merged-blocks destination. normalized blocks are FINAL only, with fixed log ordinals",
+		Use:   "upgrade-merged-blocks <source> <destination> <start> <stop>",
+		Short: "from a merged-blocks source, rewrite blocks to a new merged-blocks destination, while applying all possible upgrades",
 		Args:  cobra.ExactArgs(4),
-		RunE:  getMergedBlockNormalizer(zlog, tracer, tweakFunc),
+		RunE:  getMergedBlockUpgrader(zlog, tracer, tweakFunc),
 	}
 
 	return out
 }
 
-func getMergedBlockNormalizer(zlog *zap.Logger, tracer logging.Tracer, tweakFunc func(block *bstream.Block) (*bstream.Block, error)) func(cmd *cobra.Command, args []string) error {
+func getMergedBlockUpgrader(zlog *zap.Logger, tracer logging.Tracer, tweakFunc func(block *bstream.Block) (*bstream.Block, error)) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		source := args[0]
 		sourceStore, err := dstore.NewDBinStore(source)
@@ -50,6 +50,7 @@ func getMergedBlockNormalizer(zlog *zap.Logger, tracer logging.Tracer, tweakFunc
 			return fmt.Errorf("parsing stop block num: %w", err)
 		}
 
+		zlog.Info("starting block upgrader process", zap.Uint64("start", start), zap.Uint64("stop", stop), zap.String("source", source), zap.String("dest", dest))
 		writer := &mergedBlocksWriter{
 			store:         destStore,
 			lowBlockNum:   start,
