@@ -31,7 +31,7 @@ func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) e
 		blk = b
 	}
 
-	if w.lowBlockNum == 0 { // initial block
+	if w.lowBlockNum == 0 && blk.Number > 99 { // initial block
 		if blk.Number%100 != 0 && blk.Number != bstream.GetProtocolFirstStreamableBlock {
 			return fmt.Errorf("received unexpected block %s (not a boundary, not the first streamable block %d)", blk, bstream.GetProtocolFirstStreamableBlock)
 		}
