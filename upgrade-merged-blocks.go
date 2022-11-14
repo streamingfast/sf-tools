@@ -53,7 +53,7 @@ func getMergedBlockUpgrader(zlog *zap.Logger, tracer logging.Tracer, tweakFunc f
 		zlog.Info("starting block upgrader process", zap.Uint64("start", start), zap.Uint64("stop", stop), zap.String("source", source), zap.String("dest", dest))
 		writer := &mergedBlocksWriter{
 			store:         destStore,
-			lowBlockNum:   start,
+			lowBlockNum:   lowBoundary(start),
 			stopBlockNum:  stop,
 			writerFactory: bstream.GetBlockWriterFactory,
 			tweakBlock:    tweakFunc,
