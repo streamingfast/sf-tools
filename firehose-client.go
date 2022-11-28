@@ -44,7 +44,7 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		ctx := context.Background()
 
 		endpoint := args[0]
-		start, err := strconv.ParseUint(args[1], 10, 64)
+		start, err := strconv.ParseInt(args[1], 10, 64)
 		if err != nil {
 			return fmt.Errorf("parsing start block num: %w", err)
 		}
@@ -89,7 +89,7 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 		}
 
 		request := &pbfirehose.Request{
-			StartBlockNum:   int64(start),
+			StartBlockNum:   start,
 			StopBlockNum:    stop,
 			Transforms:      transforms,
 			FinalBlocksOnly: finalBlocksOnly,
