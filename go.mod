@@ -9,6 +9,7 @@ require (
 	github.com/manifoldco/promptui v0.3.2
 	github.com/mostynb/go-grpc-compression v1.1.17
 	github.com/nicksnyder/go-i18n v1.10.1 // indirect
+	github.com/prometheus/client_golang v1.12.1
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.8.1
 	github.com/streamingfast/bstream v0.0.2-0.20221017131819-2a7e38be1047
