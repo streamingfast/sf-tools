@@ -2,11 +2,11 @@ package sftools
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
@@ -14,7 +14,6 @@ import (
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -62,8 +61,6 @@ func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsS
 		}
 		defer connClose()
 
-		grpcCallOpts = append(grpcCallOpts, grpc.UseCompressor(zstd.Name))
-
 		var transforms []*anypb.Any
 		if transformsSetter != nil {
 			transforms, err = transformsSetter(cmd)
@@ -110,6 +107,7 @@ func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsS
 			for {
 				response, err := stream.Recv()
 				if err != nil {
+					zlog.Error("got error from stream", zap.Error(err))
 					markFailure(endpoint)
 					continue
 				}
