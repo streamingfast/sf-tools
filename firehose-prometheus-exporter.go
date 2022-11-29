@@ -2,7 +2,6 @@ package sftools
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync"
 	"time"
