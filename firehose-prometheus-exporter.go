@@ -108,7 +108,7 @@ func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsS
 				if err != nil {
 					zlog.Error("got error from stream", zap.Error(err))
 					markFailure(endpoint)
-					continue
+					break
 				}
 
 				if cursor, err := bstream.CursorFromOpaque(response.Cursor); err == nil {
