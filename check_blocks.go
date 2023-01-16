@@ -6,7 +6,6 @@ import (
 	"io"
 	"regexp"
 	"strconv"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
@@ -263,7 +262,7 @@ func validateBlockSegment(
 			}
 
 			if printDetails == PrintFull {
-				out, err := jsonpb.MarshalIndentToString(block.ToNative().(proto.Message), "  ")
+				out, err := jsonpb.MarshalIndentToString(block.ToProtocol().(proto.Message), "  ")
 				if err != nil {
 					fmt.Printf("❌ Unable to print full block %s: %s\n", block.AsRef(), err)
 					continue
