@@ -144,7 +144,7 @@ func CheckMergedBlocks(
 	)
 
 	if blockRange.Bounded() &&
-		(highestBlockSeen < blockRange.Stop ||
+		(highestBlockSeen < (blockRange.Stop-1) ||
 			(lowestBlockSeen > blockRange.Start && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
 		fmt.Printf("🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
 	}
