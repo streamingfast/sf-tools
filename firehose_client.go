@@ -25,17 +25,18 @@ type TransformsSetter func(cmd *cobra.Command) ([]*anypb.Any, error)
 var GetFirehoseClientCmd = func(zlog *zap.Logger, tracer logging.Tracer, transformsSetter TransformsSetter) *cobra.Command {
 	out := &cobra.Command{
 		Use:   "firehose-client",
-		Short: "print firehose block stream as JSON",
+		Short: "Connects to a Firehose endpoint over gRPC and print block stream as JSON to terminal",
 		Args:  cobra.ExactArgs(3),
 		RunE:  getFirehoseClientE(zlog, tracer, transformsSetter),
 	}
 	out.Flags().StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
-	out.Flags().String("compression", "none", "http compression: use either 'none', 'gzip' or 'zstd'")
-	out.Flags().String("cursor", "", "Send this cursor with the request")
-	out.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to firehose")
-	out.Flags().BoolP("insecure", "k", false, "Skip SSL certificate validation when connecting to firehose")
+	out.Flags().String("compression", "none", "The HTTP compression: use either 'none', 'gzip' or 'zstd'")
+	out.Flags().String("cursor", "", "Use this cursor with the request to resume your stream at the following block pointed by the cursor")
+	out.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to Firehose")
+	out.Flags().BoolP("insecure", "k", false, "Use SSL connection to Firehose but skip SSL certificate validation")
 	out.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
 	out.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
+
 	return out
 }
 

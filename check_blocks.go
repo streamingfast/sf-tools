@@ -6,6 +6,7 @@ import (
 	"io"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
@@ -47,6 +48,10 @@ func CheckMergedBlocks(
 		blockRange.Start = bstream.GetProtocolFirstStreamableBlock
 	}
 
+	if blockRange.Start > blockRange.Stop {
+		return fmt.Errorf("invalid range: start %d is after stop %d", blockRange.Start, blockRange.Stop)
+	}
+
 	holeFound := false
 	expected = RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize)
 	currentStartBlk := uint32(blockRange.Start)
@@ -81,6 +86,21 @@ func CheckMergedBlocks(
 
 		baseNum32 = uint32(baseNum)
 
+		if baseNum32 != expected {
+			// There is no previous valid block range if we are at the ever first seen file
+			if count > 1 {
+				fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))})
+			}
+
+			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
+			missingRange := BlockRange{uint64(expected), uint64(RoundToBundleEndBlock(baseNum32-fileBlockSize, fileBlockSize))}
+			fmt.Printf("❌ Range %s! (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
+			currentStartBlk = baseNum32
+
+			holeFound = true
+		}
+		expected = baseNum32 + fileBlockSize
+
 		if printDetails != PrintNothing {
 			newSeenFilters, lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
 			for key, filters := range newSeenFilters {
@@ -99,23 +119,7 @@ func CheckMergedBlocks(
 			if uint64(baseNum32+fileBlockSize) > highestBlockSeen {
 				highestBlockSeen = uint64(baseNum32 + fileBlockSize)
 			}
-
 		}
-
-		if baseNum32 != expected {
-			// There is no previous valid block range if we are at the ever first seen file
-			if count > 1 {
-				fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))})
-			}
-
-			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
-			missingRange := BlockRange{uint64(expected), uint64(RoundToBundleEndBlock(baseNum32-fileBlockSize, fileBlockSize))}
-			fmt.Printf("❌ Range %s! (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
-			currentStartBlk = baseNum32
-
-			holeFound = true
-		}
-		expected = baseNum32 + fileBlockSize
 
 		if count%10000 == 0 {
 			fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(RoundToBundleEndBlock(baseNum32, fileBlockSize))})
@@ -128,11 +132,21 @@ func CheckMergedBlocks(
 
 		return nil
 	})
+
 	if err != nil && err != errStopWalk {
 		return err
 	}
 
-	if !blockRange.Unbounded() && highestBlockSeen < blockRange.Stop || (lowestBlockSeen > blockRange.Start && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock) {
+	logger.Debug("checking incomplete range",
+		zap.Stringer("range", blockRange),
+		zap.Bool("range_unbounded", blockRange.Unbounded()),
+		zap.Uint64("lowest_block_seen", lowestBlockSeen),
+		zap.Uint64("highest_block_seen", highestBlockSeen),
+	)
+
+	if blockRange.Bounded() &&
+		(highestBlockSeen < blockRange.Stop ||
+			(lowestBlockSeen > blockRange.Start && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
 		fmt.Printf("🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
 	}
 

@@ -15,6 +15,10 @@ type BlockRange struct {
 	Stop  uint64
 }
 
+func (b BlockRange) Bounded() bool {
+	return b.Stop != 0
+}
+
 func (b BlockRange) Unbounded() bool {
 	return b.Stop == 0
 }
