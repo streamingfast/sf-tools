@@ -93,7 +93,7 @@ func CheckMergedBlocks(
 
 			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
 			missingRange := BlockRange{uint64(expected), uint64(RoundToBundleEndBlock(baseNum32-fileBlockSize, fileBlockSize))}
-			fmt.Printf("❌ Range %s! (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
+			fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
 			currentStartBlk = baseNum32
 
 			holeFound = true
@@ -143,16 +143,18 @@ func CheckMergedBlocks(
 		zap.Uint64("highest_block_seen", highestBlockSeen),
 	)
 
+	fmt.Println()
+	fmt.Println("Summary:")
 	if blockRange.Bounded() &&
 		(highestBlockSeen < (blockRange.Stop-1) ||
 			(lowestBlockSeen > blockRange.Start && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
-		fmt.Printf("🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
+		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
 	}
 
 	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < highestBlockSeen {
-		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), highestBlockSeen}, tfdb.lastLinkedBlock.Number)
+		fmt.Printf("> 🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), highestBlockSeen}, tfdb.lastLinkedBlock.Number)
 	} else {
-		fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(highestBlockSeen)})
+		fmt.Printf("> ✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(highestBlockSeen)})
 	}
 
 	if len(seenFilters) > 0 {
@@ -165,9 +167,9 @@ func CheckMergedBlocks(
 	}
 
 	if holeFound {
-		fmt.Printf("🆘 Holes found!\n")
+		fmt.Printf("> 🆘 Holes found!\n")
 	} else {
-		fmt.Printf("🆗 No hole found\n")
+		fmt.Printf("> 🆗 No hole found\n")
 	}
 
 	return nil
