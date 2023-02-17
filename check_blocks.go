@@ -142,19 +142,19 @@ func CheckMergedBlocks(
 		zap.Uint64("lowest_block_seen", lowestBlockSeen),
 		zap.Uint64("highest_block_seen", highestBlockSeen),
 	)
+	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < highestBlockSeen {
+		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), highestBlockSeen}, tfdb.lastLinkedBlock.Number)
+	} else {
+		fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(highestBlockSeen)})
+	}
 
 	fmt.Println()
 	fmt.Println("Summary:")
+
 	if blockRange.Bounded() &&
 		(highestBlockSeen < (blockRange.Stop-1) ||
 			(lowestBlockSeen > blockRange.Start && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
 		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
-	}
-
-	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < highestBlockSeen {
-		fmt.Printf("> 🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), highestBlockSeen}, tfdb.lastLinkedBlock.Number)
-	} else {
-		fmt.Printf("> ✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(highestBlockSeen)})
 	}
 
 	if len(seenFilters) > 0 {
