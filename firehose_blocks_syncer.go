@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose/client"
@@ -51,8 +52,10 @@ func DownloadFirehoseBlocks(
 	mergeWriter := &mergedBlocksWriter{
 		store:         store,
 		writerFactory: bstream.GetBlockWriterFactory,
-		tweakBlock:    tweakBlock,
-		logger:        logger,
+		tweakBlock: func(_ *cobra.Command, b *bstream.Block) (*bstream.Block, error) {
+			return tweakBlock(b)
+		},
+		logger: logger,
 	}
 
 	for {

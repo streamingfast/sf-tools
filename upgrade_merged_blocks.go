@@ -16,7 +16,7 @@ import (
 	"github.com/streamingfast/dstore"
 )
 
-var GetMergedBlocksUpgrader = func(zlog *zap.Logger, tracer logging.Tracer, tweakFunc func(block *bstream.Block) (*bstream.Block, error)) *cobra.Command {
+var GetMergedBlocksUpgrader = func(zlog *zap.Logger, tracer logging.Tracer, tweakFunc func(cmd *cobra.Command, block *bstream.Block) (*bstream.Block, error)) *cobra.Command {
 	out := &cobra.Command{
 		Use:   "upgrade-merged-blocks <source> <destination> <start> <stop>",
 		Short: "from a merged-blocks source, rewrite blocks to a new merged-blocks destination, while applying all possible upgrades",
@@ -27,7 +27,7 @@ var GetMergedBlocksUpgrader = func(zlog *zap.Logger, tracer logging.Tracer, twea
 	return out
 }
 
-func getMergedBlockUpgrader(zlog *zap.Logger, tracer logging.Tracer, tweakFunc func(block *bstream.Block) (*bstream.Block, error)) func(cmd *cobra.Command, args []string) error {
+func getMergedBlockUpgrader(zlog *zap.Logger, tracer logging.Tracer, tweakFunc func(cmd *cobra.Command, block *bstream.Block) (*bstream.Block, error)) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		source := args[0]
 		sourceStore, err := dstore.NewDBinStore(source)
@@ -52,6 +52,7 @@ func getMergedBlockUpgrader(zlog *zap.Logger, tracer logging.Tracer, tweakFunc f
 
 		zlog.Info("starting block upgrader process", zap.Uint64("start", start), zap.Uint64("stop", stop), zap.String("source", source), zap.String("dest", dest))
 		writer := &mergedBlocksWriter{
+			cmd:           cmd,
 			store:         destStore,
 			lowBlockNum:   lowBoundary(start),
 			stopBlockNum:  stop,

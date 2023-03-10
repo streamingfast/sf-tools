@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
@@ -18,13 +19,14 @@ type mergedBlocksWriter struct {
 	blocks        []*bstream.Block
 	writerFactory bstream.BlockWriterFactory
 	logger        *zap.Logger
+	cmd           *cobra.Command
 
-	tweakBlock func(*bstream.Block) (*bstream.Block, error)
+	tweakBlock func(*cobra.Command, *bstream.Block) (*bstream.Block, error)
 }
 
 func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) error {
 	if w.tweakBlock != nil {
-		b, err := w.tweakBlock(blk)
+		b, err := w.tweakBlock(w.cmd, blk)
 		if err != nil {
 			return fmt.Errorf("tweaking block: %w", err)
 		}
