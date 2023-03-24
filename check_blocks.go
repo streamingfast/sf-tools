@@ -47,7 +47,7 @@ func CheckMergedBlocks(
 		blockRange.Start = bstream.GetProtocolFirstStreamableBlock
 	}
 
-	if blockRange.Start > blockRange.Stop {
+	if blockRange.Stop > 0 && blockRange.Start > blockRange.Stop {
 		return fmt.Errorf("invalid range: start %d is after stop %d", blockRange.Start, blockRange.Stop)
 	}
 
