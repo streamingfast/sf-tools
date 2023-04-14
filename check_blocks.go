@@ -21,8 +21,8 @@ type PrintDetails uint8
 
 const (
 	PrintNothing PrintDetails = iota
-	PrintWarnings
 	PrintErrors
+	PrintWarnings
 	PrintStats
 	PrintFull
 	MaxUint64 = ^uint64(0)
