@@ -21,6 +21,8 @@ type PrintDetails uint8
 
 const (
 	PrintNothing PrintDetails = iota
+	PrintWarnings
+	PrintErrors
 	PrintStats
 	PrintFull
 	MaxUint64 = ^uint64(0)
@@ -88,12 +90,17 @@ func CheckMergedBlocks(
 		if baseNum32 != expected {
 			// There is no previous valid block range if we are at the ever first seen file
 			if count > 1 {
-				fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))})
+				if printDetails >= PrintStats {
+					fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))})
+				}
 			}
 
 			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
 			missingRange := BlockRange{uint64(expected), uint64(RoundToBundleEndBlock(baseNum32-fileBlockSize, fileBlockSize))}
-			fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
+
+			if printDetails >= PrintErrors {
+				fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
+			}
 			currentStartBlk = baseNum32
 
 			holeFound = true
@@ -143,9 +150,13 @@ func CheckMergedBlocks(
 		zap.Uint64("highest_block_seen", highestBlockSeen),
 	)
 	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < highestBlockSeen {
-		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), highestBlockSeen}, tfdb.lastLinkedBlock.Number)
+		if printDetails >= PrintWarnings {
+			fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), highestBlockSeen}, tfdb.lastLinkedBlock.Number)
+		}
 	} else {
-		fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(highestBlockSeen)})
+		if printDetails >= PrintStats {
+			fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(highestBlockSeen)})
+		}
 	}
 
 	fmt.Println()
@@ -154,7 +165,9 @@ func CheckMergedBlocks(
 	if blockRange.Bounded() &&
 		(highestBlockSeen < (blockRange.Stop-1) ||
 			(lowestBlockSeen > blockRange.Start && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
-		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
+		if printDetails >= PrintWarnings {
+			fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
+		}
 	}
 
 	if len(seenFilters) > 0 {
@@ -206,11 +219,24 @@ func validateBlockSegment(
 		return
 	}
 
-	// FIXME: Need to track block continuity (100, 101, 102a, 102b, 103, ...) and report which one are missing
+	baseNum, _ := strconv.ParseUint(segment, 10, 64)
+	topNum := baseNum + uint64(fileBlockSize)
 	seenBlockCount := 0
+	var seenBlockFromPreviousBundle bool
 	for {
 		block, err := readerFactory.Read()
 		if block != nil {
+			if block.Number+uint64(fileBlockSize) < baseNum {
+				if seenBlockFromPreviousBundle {
+					fmt.Printf("❌ more than one blocks too low for in segment %s (found %d)\n", segment, block.Number)
+				}
+				seenBlockFromPreviousBundle = true
+			}
+			if block.Number >= topNum {
+				fmt.Printf("❌ invalid block %d in segment %s\n", block.Number, segment)
+
+			}
+
 			if !blockRange.Unbounded() {
 				if block.Number > blockRange.Stop {
 					return
@@ -239,14 +265,16 @@ func validateBlockSegment(
 					tfdb.firstUnlinkableBlock = block
 				}
 
-				if printDetails != PrintNothing {
+				if printDetails >= PrintWarnings {
 					// TODO: this print should be under a 'check forkable' flag?
 					fmt.Printf("🔶 Block #%d is not linkable at this point\n", block.Num())
 				}
 
 				if tfdb.unlinkableSegmentCount > 99 && tfdb.unlinkableSegmentCount%100 == 0 {
 					// TODO: this print should be under a 'check forkable' flag?
-					fmt.Printf("❌ Large gap of %d unlinkable blocks found in chain. Last linked block: %d, first Unlinkable block: %d. \n", tfdb.unlinkableSegmentCount, tfdb.lastLinkedBlock.Num(), tfdb.firstUnlinkableBlock.Num())
+					if printDetails >= PrintErrors {
+						fmt.Printf("❌ Large gap of %d unlinkable blocks found in chain. Last linked block: %d, first Unlinkable block: %d. \n", tfdb.unlinkableSegmentCount, tfdb.lastLinkedBlock.Num(), tfdb.firstUnlinkableBlock.Num())
+					}
 				}
 			} else {
 				tfdb.lastLinkedBlock = block
@@ -278,14 +306,20 @@ func validateBlockSegment(
 
 		if block == nil && err == io.EOF {
 			if seenBlockCount < expectedBlockCount(segment, fileBlockSize) {
-				fmt.Printf("🔶 Segment %s contained only %d blocks (< 100), this can happen on some chains\n", segment, seenBlockCount)
+
+				if printDetails >= PrintWarnings {
+					fmt.Printf("🔶 Segment %s contained only %d blocks (< 100), this can happen on some chains\n", segment, seenBlockCount)
+				}
 			}
 
 			return
 		}
 
 		if err != nil {
-			fmt.Printf("❌ Unable to read all blocks from segment %s after reading %d blocks: %s\n", segment, seenBlockCount, err)
+
+			if printDetails >= PrintErrors {
+				fmt.Printf("❌ Unable to read all blocks from segment %s after reading %d blocks: %s\n", segment, seenBlockCount, err)
+			}
 			return
 		}
 	}
