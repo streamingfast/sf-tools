@@ -36,6 +36,7 @@ var GetFirehoseClientCmd = func(zlog *zap.Logger, tracer logging.Tracer, transfo
 	out.Flags().BoolP("insecure", "k", false, "Use SSL connection to Firehose but skip SSL certificate validation")
 	out.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
 	out.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
+	out.Flags().Uint64("limit", 0, "If non-zero, will stop after this many blocks")
 
 	return out
 }
@@ -63,6 +64,7 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 
 		printCursorOnly := mustGetBool(cmd, "print-cursor-only")
 		finalBlocksOnly := mustGetBool(cmd, "final-blocks-only")
+		limit := mustGetUint64(cmd, "limit")
 
 		firehoseClient, connClose, grpcCallOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 		if err != nil {
@@ -130,7 +132,11 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 			}()
 		}
 
+		count := uint64(0)
 		for {
+			if limit != 0 && count >= limit {
+				break
+			}
 			response, err := stream.Recv()
 			if err != nil {
 				if err == io.EOF {
@@ -138,6 +144,7 @@ func getFirehoseClientE(zlog *zap.Logger, tracer logging.Tracer, transformsSette
 				}
 				return fmt.Errorf("stream error while receiving: %w", err)
 			}
+			count++
 
 			if printCursorOnly {
 				fmt.Printf("%s - %s\n", response.Step.String(), response.Cursor)

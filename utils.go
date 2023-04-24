@@ -41,3 +41,11 @@ func mustGetBool(cmd *cobra.Command, flagName string) bool {
 	}
 	return val
 }
+
+func mustGetUint64(cmd *cobra.Command, flagName string) uint64 {
+	val, err := cmd.Flags().GetUint64(flagName)
+	if err != nil {
+		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+	return val
+}
