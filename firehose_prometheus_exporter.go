@@ -42,7 +42,6 @@ var GetFirehosePrometheusExporterCmd = func(zlog *zap.Logger, tracer logging.Tra
 func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsSetter TransformsSetter) func(cmd *cobra.Command, args []string) error {
 
 	return func(cmd *cobra.Command, args []string) error {
-
 		ctx := context.Background()
 		endpoint := args[0]
 
@@ -90,6 +89,8 @@ func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsS
 			}
 		}()
 
+		failCounter := newFailCounter()
+
 		var sleepTime time.Duration
 		for {
 			time.Sleep(sleepTime)
@@ -97,7 +98,7 @@ func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsS
 			stream, err := firehoseClient.Blocks(ctx, request, grpcCallOpts...)
 			if err != nil {
 				zlog.Error("connecting", zap.Error(err))
-				markFailure(endpoint)
+				maybeMarkFailure(endpoint, failCounter)
 				continue
 			}
 
@@ -107,7 +108,7 @@ func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsS
 				response, err := stream.Recv()
 				if err != nil {
 					zlog.Error("got error from stream", zap.Error(err))
-					markFailure(endpoint)
+					maybeMarkFailure(endpoint, failCounter)
 					break
 				}
 
@@ -117,7 +118,7 @@ func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsS
 					lastBlockLock.Lock()
 					lastBlockReceived = time.Now()
 					lastBlockLock.Unlock()
-					markSuccess(endpoint)
+					markSuccess(endpoint, failCounter)
 				}
 			}
 
@@ -134,10 +135,44 @@ func runPrometheusExporterE(zlog *zap.Logger, tracer logging.Tracer, transformsS
 	}
 }
 
-func markSuccess(endpoint string) {
+func markSuccess(endpoint string, failCounter *failCounter) {
+	failCounter.Reset()
 	status.With(prometheus.Labels{"endpoint": endpoint}).Set(1)
 }
 
-func markFailure(endpoint string) {
-	status.With(prometheus.Labels{"endpoint": endpoint}).Set(0)
+func maybeMarkFailure(endpoint string, failCounter *failCounter) {
+	failCounter.Inc()
+	if failCounter.Get() > 3 {
+		status.With(prometheus.Labels{"endpoint": endpoint}).Set(0)
+	}
+}
+
+type failCounter struct {
+	failCount int
+	mu        sync.Mutex
+}
+
+func newFailCounter() *failCounter {
+	return &failCounter{}
+}
+
+func (f *failCounter) Inc() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.failCount++
+}
+
+func (f *failCounter) Get() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.failCount
+}
+
+func (f *failCounter) Reset() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.failCount = 0
 }
