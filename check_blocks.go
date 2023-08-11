@@ -20,7 +20,7 @@ var numberRegex = regexp.MustCompile(`(\d{10})`)
 type PrintDetails uint8
 
 const (
-	PrintNothing PrintDetails = iota
+	PrintNoDetails PrintDetails = iota
 	PrintErrors
 	PrintWarnings
 	PrintStats
@@ -37,7 +37,11 @@ func CheckMergedBlocks(
 	blockPrinter func(block *bstream.Block),
 	printDetails PrintDetails,
 ) error {
+	readAllBlocks := printDetails != PrintNoDetails
 	fmt.Printf("Checking block holes on %s\n", storeURL)
+	if readAllBlocks {
+		fmt.Println("Detailed printing requested: All block files will be read and checked for continuity. This may take a while...")
+	}
 
 	var expected uint32
 	var count int
@@ -98,16 +102,14 @@ func CheckMergedBlocks(
 			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
 			missingRange := BlockRange{uint64(expected), uint64(RoundToBundleEndBlock(baseNum32-fileBlockSize, fileBlockSize))}
 
-			if printDetails >= PrintErrors {
-				fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
-			}
+			fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
 			currentStartBlk = baseNum32
 
 			holeFound = true
 		}
 		expected = baseNum32 + fileBlockSize
 
-		if printDetails != PrintNothing {
+		if readAllBlocks {
 			newSeenFilters, lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
 			for key, filters := range newSeenFilters {
 				seenFilters[key] = filters
