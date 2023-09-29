@@ -49,7 +49,7 @@ func DownloadFirehoseBlocks(
 		return err
 	}
 
-	mergeWriter := &mergedBlocksWriter{
+	mergeWriter := &MergedBlocksWriter{
 		store:         store,
 		writerFactory: bstream.GetBlockWriterFactory,
 		tweakBlock: func(_ *cobra.Command, b *bstream.Block) (*bstream.Block, error) {

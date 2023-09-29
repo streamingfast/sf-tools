@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type mergedBlocksWriter struct {
+type MergedBlocksWriter struct {
 	store        dstore.Store
 	lowBlockNum  uint64
 	stopBlockNum uint64
@@ -24,7 +24,16 @@ type mergedBlocksWriter struct {
 	tweakBlock func(*cobra.Command, *bstream.Block) (*bstream.Block, error)
 }
 
-func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) error {
+func NewMergedBlocksWriter(store dstore.Store, writerFactory bstream.BlockWriterFactory, logger *zap.Logger) *MergedBlocksWriter {
+	return &MergedBlocksWriter{
+		store:         store,
+		writerFactory: bstream.GetBlockWriterFactory,
+		logger:        logger,
+	}
+
+}
+
+func (w *MergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) error {
 	if w.tweakBlock != nil {
 		b, err := w.tweakBlock(w.cmd, blk)
 		if err != nil {
@@ -69,7 +78,7 @@ func filename(num uint64) string {
 	return fmt.Sprintf("%010d", num)
 }
 
-func (w *mergedBlocksWriter) writeBundle() error {
+func (w *MergedBlocksWriter) writeBundle() error {
 	file := filename(w.lowBlockNum)
 	w.logger.Info("writing merged file to store (suffix: .dbin.zst)", zap.String("filename", file), zap.Uint64("lowBlockNum", w.lowBlockNum))
 
